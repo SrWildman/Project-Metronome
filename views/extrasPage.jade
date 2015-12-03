@@ -1,0 +1,13 @@
+div(class="panel row vertical-center", id="extras")
+    div(class="container")
+        div(class="row-md-1")
+            h3(class="text-center") Extras        
+        div(class="row-md-1 text-center")
+            h4 Tempo : {{ tempo }}
+                input(type="range", min="0", max="300", step="1", ng-model="tempo")
+        div(class="row-md-1 text-center")
+            h4 Acceptable Error
+            select(name="error", class="select-style", ng-model="error", ng-options="err.val as err.label for err in errors")
+        div(class="row-md-1")
+            div(class="col-md-12")
+            a(type="button", class="buttonOnRed btn btn-default pull-right", href="#results" ng-click="res()") Update

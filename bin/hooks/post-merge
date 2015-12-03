@@ -1,0 +1,5 @@
+#!/bin/bash
+
+(cd ../../; bin/install-hooks; sudo npm install)
+
+exit 0

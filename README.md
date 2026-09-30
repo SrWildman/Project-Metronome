@@ -25,3 +25,9 @@ npm run lint
 npm run typecheck
 npm run build      # static site in dist/
 ```
+
+## Deployment
+
+Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`. One-time setup:
+repo **Settings → Pages → Source: GitHub Actions**. The site is served from
+`https://<owner>.github.io/<repo>/`; the workflow sets `BASE_PATH` accordingly.

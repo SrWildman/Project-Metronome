@@ -1,160 +1,178 @@
-import { useMemo, useState } from 'react';
-import { FieldMap } from './components/FieldMap';
-import { RadioGroup, Slider } from './components/inputs';
-import {
-  calculateField,
-  errorSeconds,
-  FOCAL_POINTS,
-  timeSourceToPoint,
-  type FocalPointId,
-  type TimeSourceInput,
-} from './core/delay';
-import type { FieldType, Marker } from './core/field';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { ExplainPanel } from './components/ExplainPanel';
+import { MapView } from './components/MapView';
+import { DisplayPanel, FieldPanel, FocalPanel, TimeSourcePanel, TimingPanel, WeatherPanel } from './components/Panels';
+import { Readout } from './components/Readout';
+import { headerButtonClass, Section } from './components/ui';
+import { createModel, fieldStats, toCounts, Zone } from './core/model';
+import { ZONE_HEX } from './core/render';
+import { toScenario } from './core/state';
+import { useAppState } from './hooks/useAppState';
 
-const MAX_VERTICAL_STEPS: Record<FieldType, number> = { college: 32, highschool: 28 };
-
-const ERROR_NOTES = Array.from({ length: 7 }, (_, i) => {
-  const value = 2 ** (i + 2);
-  return { value, label: `1/${value} note` };
-});
-
-const FIELD_OPTIONS = [
-  { value: 'highschool', label: 'High School' },
-  { value: 'college', label: 'College' },
-] as const;
-
-const MARKER_OPTIONS = [
-  { value: 0, label: 'Front Sideline' },
-  { value: 1, label: 'Front Hash' },
-  { value: 2, label: 'Back Hash' },
-  { value: 3, label: 'Back Sideline' },
-] as const;
-
-const FOCAL_OPTIONS = (Object.keys(FOCAL_POINTS) as FocalPointId[]).map((id) => ({
-  value: id,
-  label: FOCAL_POINTS[id].label,
-}));
+function Swatch({ color, pattern }: { color: string; pattern?: string }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block size-4 rounded-sm align-[-0.2em] ring-1 ring-black/40"
+      style={{ background: color, backgroundImage: pattern }}
+    />
+  );
+}
 
 export function App() {
-  const [field, setField] = useState<FieldType>('highschool');
-  const [focalPoint, setFocalPoint] = useState<FocalPointId>('hspb');
-  const [tempo, setTempo] = useState(160);
-  const [noteDivisor, setNoteDivisor] = useState(64);
-  const [ts, setTs] = useState<TimeSourceInput>({
-    yardLine: 50,
-    fieldSide: 1,
-    marker: 1,
-    vertical: { whole: 0, partial: 0, front: true },
-    horizontal: { whole: 0, partial: 0, inside: true },
-  });
+  const { state, field, selectedTs, setSelectedTs, actions } = useAppState();
+  const [copied, setCopied] = useState<string | null>(null);
 
-  const timeSource = useMemo(() => timeSourceToPoint(ts, field), [ts, field]);
-  const result = useMemo(
-    () => calculateField(timeSource, FOCAL_POINTS[focalPoint], errorSeconds(tempo, noteDivisor), field),
-    [timeSource, focalPoint, tempo, noteDivisor, field],
+  const scenario = useMemo(() => toScenario(state), [state]);
+  const model = useMemo(() => createModel(scenario), [scenario]);
+
+  // The full-field scan is the only expensive step, and it doesn't depend on tempo,
+  // so run it at low priority and only when the geometry or weather changes.
+  const { timeSources, focalPoint, tempF, windMph, windToDeg } = state;
+  const geometry = useDeferredValue(
+    useMemo(
+      () => ({ field, timeSources, focalPoint, tempF, windMph, windToDeg }),
+      [field, timeSources, focalPoint, tempF, windMph, windToDeg],
+    ),
   );
+  const stats = useMemo(
+    () => fieldStats(createModel({ ...geometry, tempo: 120, noteDivisor: 4 })),
+    [geometry],
+  );
+  const green = stats.greenFraction(model.error);
 
-  const setVertical = (patch: Partial<TimeSourceInput['vertical']>) =>
-    setTs((t) => ({ ...t, vertical: { ...t.vertical, ...patch } }));
-  const setHorizontal = (patch: Partial<TimeSourceInput['horizontal']>) =>
-    setTs((t) => ({ ...t, horizontal: { ...t.horizontal, ...patch } }));
-
-  const changeField = (next: FieldType) => {
-    setField(next);
-    setVertical({ whole: Math.min(ts.vertical.whole, MAX_VERTICAL_STEPS[next]) });
+  const share = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.share) await navigator.share({ title: 'Project Metronome', url });
+      else {
+        await navigator.clipboard.writeText(url);
+        setCopied('Link copied to the clipboard.');
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied('Link copied to the clipboard.');
+      } catch {
+        setCopied('Copy the address from your browser to share this setup.');
+      }
+    }
+    window.setTimeout(() => setCopied(null), 4000);
   };
 
   return (
-    <>
-      <header className="hero">
-        <h1>Project Metronome</h1>
-        <p>
-          Project Metronome helps directors and instructors of marching arts programs understand when
-          it is appropriate for students to listen to the metronome/drumline, and when the sound
-          delay is too great and will affect ensemble timing.
-        </p>
-      </header>
-
-      <main className="layout">
-        <section className="controls" aria-label="Settings">
-          <h2>Field</h2>
-          <RadioGroup legend="Field type" name="field" value={field} options={FIELD_OPTIONS} onChange={changeField} />
-          <RadioGroup legend="Focal point" name="focal" value={focalPoint} options={FOCAL_OPTIONS} onChange={setFocalPoint} />
-
-          <h2>Time source</h2>
-          <p className="hint">
-            The location of the metronome, drumline, or anything else controlling tempo. Steps are a
-            standard 22.5 inches.
-          </p>
-          <Slider label={`${ts.yardLine} yard line`} value={ts.yardLine} min={0} max={50} step={5}
-            onChange={(yardLine) => setTs({ ...ts, yardLine })} />
-          <RadioGroup legend="Side" name="side" value={ts.fieldSide}
-            options={[{ value: 1, label: 'Side 1' }, { value: 2, label: 'Side 2' }]}
-            onChange={(fieldSide) => setTs({ ...ts, fieldSide: fieldSide as 1 | 2 })} />
-          <Slider label={`Horizontal whole steps: ${ts.horizontal.whole}`} value={ts.horizontal.whole} min={0} max={4} step={1}
-            onChange={(whole) => setHorizontal({ whole })} />
-          <Slider label={`Horizontal partial step: ${ts.horizontal.partial}`} value={ts.horizontal.partial} min={0} max={0.5} step={0.5}
-            onChange={(partial) => setHorizontal({ partial })} />
-          <RadioGroup legend="Horizontal direction" name="hdir" value={ts.horizontal.inside ? 'inside' : 'outside'}
-            options={[{ value: 'inside', label: 'Inside' }, { value: 'outside', label: 'Outside' }]}
-            onChange={(v) => setHorizontal({ inside: v === 'inside' })} />
-          <RadioGroup legend="Marker" name="marker" value={ts.marker} options={MARKER_OPTIONS}
-            onChange={(marker) => setTs({ ...ts, marker: marker as Marker })} />
-          <Slider label={`Vertical whole steps: ${ts.vertical.whole}`} value={ts.vertical.whole} min={0} max={MAX_VERTICAL_STEPS[field]} step={1}
-            onChange={(whole) => setVertical({ whole })} />
-          <Slider label={`Vertical partial step: ${ts.vertical.partial}`} value={ts.vertical.partial} min={0} max={0.5} step={0.5}
-            onChange={(partial) => setVertical({ partial })} />
-          <RadioGroup legend="Vertical direction" name="vdir" value={ts.vertical.front ? 'front' : 'back'}
-            options={[{ value: 'front', label: 'In front of' }, { value: 'back', label: 'Behind' }]}
-            onChange={(v) => setVertical({ front: v === 'front' })} />
-
-          <h2>Timing</h2>
-          <Slider label={`Tempo: ${tempo}`} value={tempo} min={30} max={300} step={1} onChange={setTempo} />
-          <label className="select">
-            <span>Acceptable error</span>
-            <select value={noteDivisor} onChange={(e) => setNoteDivisor(Number(e.target.value))}>
-              {ERROR_NOTES.map((n) => (
-                <option key={n.value} value={n.value}>{n.label}</option>
-              ))}
-            </select>
-          </label>
-        </section>
-
-        <section className="results" aria-label="Results">
-          <FieldMap result={result} timeSource={timeSource} />
-          <div className="legend">
-            <span><i className="swatch green" /> Play with the time source</span>
-            <span><i className="swatch yellow" /> Time source</span>
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
+      <a
+        href="#map"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-white focus:p-2 focus:text-black"
+      >
+        Skip to the map
+      </a>
+      <header className="shrink-0 border-b border-slate-200 bg-slate-900 text-white dark:border-slate-800">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <h1 className="text-lg font-bold tracking-widest uppercase">Project Metronome</h1>
+            <p className="text-sm text-slate-300">Where should the band listen, and where should it watch?</p>
           </div>
-          <details open>
-            <summary>How to read the map</summary>
-            <p>
-              The map is a grid marked in half-step increments. Hover over it for details about a
-              location. Anyone in the green zone may play with what they hear from the time source.
-            </p>
-            <p>
-              If the conductor and time source (yellow dot) are visually together, anyone within the
-              same ring as the time source may play with what they see from the conductor. For each ring
-              outside the time source, a player must be one note (of the selected error value) ahead of
-              what they see from the conductor. For each ring inside, a player must be one note behind.
-            </p>
-          </details>
-          <details>
-            <summary>Tutorial video</summary>
-            <iframe
-              title="Project Metronome tutorial"
-              src="https://www.youtube-nocookie.com/embed/fDRXNcMAeqg"
-              loading="lazy"
-              allowFullScreen
-            />
-          </details>
-        </section>
-      </main>
+          <div className="flex items-center gap-2">
+            <button type="button" className={headerButtonClass} onClick={share} data-testid="share">
+              Copy link
+            </button>
+            <button type="button" className={headerButtonClass} onClick={actions.reset}>
+              Reset
+            </button>
+          </div>
+        </div>
+      </header>
+      <p role="status" className="sr-only">
+        {copied}
+      </p>
+      {copied && (
+        <p aria-hidden className="bg-emerald-700 px-4 py-1 text-center text-sm text-white">
+          {copied}
+        </p>
+      )}
 
-      <footer>
-        Created by Brian Boudreaux, Zack Shackleton, Chris Sipes, and Sam Wildman ·
-        contact@projectmetronome.com
-      </footer>
-    </>
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-4 lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:overflow-hidden">
+        {/* Right column on desktop. On phones the wrappers disappear so the map can stay pinned to the top. */}
+        <div data-testid="main-column" className="contents lg:col-start-2 lg:row-start-1 lg:block lg:min-h-0 lg:space-y-4 lg:overflow-y-auto lg:pr-1">
+          <div className="contents lg:block lg:space-y-4">
+            <div className="sticky top-0 z-20 order-1 -mx-4 bg-slate-50/95 px-4 pt-2 pb-2 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none dark:bg-slate-950/95">
+              <MapView
+                state={state}
+                field={field}
+                model={model}
+                selectedTs={selectedTs}
+                onSelectTs={setSelectedTs}
+                onMoveTs={actions.moveTimeSource}
+                onMoveFocal={actions.moveFocal}
+                onMoveProbe={actions.moveProbe}
+                onRemoveTs={actions.removeTimeSource}
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" data-testid="legend">
+                <span>
+                  <Swatch color={ZONE_HEX[Zone.Green]} /> Green: play with the time source
+                </span>
+                <span>
+                  <Swatch color={ZONE_HEX[Zone.RingOdd]} /> <Swatch color={ZONE_HEX[Zone.RingEven]} /> Rings: one note
+                  (1/{state.noteDivisor}) each
+                </span>
+                <span className="text-slate-600 dark:text-slate-400">
+                  <b>1</b> time source · <b>F</b> focal point · <b>P</b> player
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400" data-testid="stats">
+                Green zone covers {Math.round(green * 100)}% of the field. Longest delay:{' '}
+                {(stats.maxDelay * 1000).toFixed(0)} ms ({toCounts(stats.maxDelay, model.scenario.tempo).toFixed(2)}{' '}
+                counts).
+              </p>
+            </div>
+            <div className="order-2">
+              <Readout state={state} field={field} model={model} />
+            </div>
+          </div>
+
+          <div className="order-4 space-y-4">
+            <ExplainPanel state={state} model={model} />
+            <Section title="How to read the map" defaultOpen={false}>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Anyone in the green zone may play with what they hear from the time source. If the conductor and
+                  time source are visually together, anyone in the same ring as the time source may play with what
+                  they see from the conductor.
+                </p>
+                <p>
+                  For each ring outside the time source's ring, a player must be one note (of the acceptable error
+                  you chose) ahead of what they see from the conductor. For each ring inside, one note behind.
+                </p>
+                <p>
+                  Click or drag on the map to move the P marker and see the numbers for that spot. Drag the yellow
+                  markers (time sources) and the diamond (focal point) to try different setups. With a keyboard, Tab
+                  to a marker and use the arrow keys (Shift for bigger steps).
+                </p>
+              </div>
+            </Section>
+            <Section title="Tutorial video" defaultOpen={false}>
+              <iframe
+                title="Project Metronome tutorial"
+                src="https://www.youtube-nocookie.com/embed/fDRXNcMAeqg"
+                loading="lazy"
+                allowFullScreen
+                className="aspect-video w-full rounded-lg border-0"
+              />
+            </Section>
+          </div>
+        </div>
+
+        <div data-testid="sidebar" className="order-3 space-y-4 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+          <FieldPanel state={state} field={field} actions={actions} />
+          <TimeSourcePanel state={state} field={field} actions={actions} selected={selectedTs} onSelect={setSelectedTs} />
+          <FocalPanel state={state} field={field} actions={actions} />
+          <TimingPanel state={state} actions={actions} stats={stats} />
+          <WeatherPanel state={state} actions={actions} />
+          <DisplayPanel state={state} actions={actions} />
+        </div>
+      </main>
+    </div>
   );
 }

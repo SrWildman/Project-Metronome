@@ -4,7 +4,10 @@
  * y runs from the front sideline (0) toward the back sideline.
  */
 
-export type FieldType = 'highschool' | 'college';
+/** Football fields have yardlines, hashes and band-jargon positions. */
+export type FootballField = 'highschool' | 'college';
+
+export const FEET_PER_UNIT = 0.9375;
 
 /** 0: front sideline, 1: front hash, 2: back hash, 3: back sideline */
 export type Marker = 0 | 1 | 2 | 3;
@@ -12,7 +15,7 @@ export type Marker = 0 | 1 | 2 | 3;
 export const X_MAX = 384;
 
 /** Number of y cells on a field (high school hashes are slightly closer together). */
-export const fieldRows = (field: FieldType): number => (field === 'college' ? 172 : 169);
+export const fieldRows = (field: FootballField): number => (field === 'college' ? 172 : 169);
 
 export const MARKER_NAMES = ['front sideline', 'front hash', 'back hash', 'back sideline'] as const;
 
@@ -32,7 +35,7 @@ export interface Location {
 }
 
 /** Converts x,y coordinates to band jargon. */
-export function fromXY(x: number, y: number, field: FieldType): Location {
+export function fromXY(x: number, y: number, field: FootballField): Location {
   const half = X_MAX / 2;
   const side = x <= half;
   const xTmp = side ? x : x - half;
@@ -100,7 +103,7 @@ export interface BandLocation {
 }
 
 /** Converts band jargon to x,y coordinates. */
-export function toXY(loc: BandLocation, field: FieldType): { x: number; y: number } {
+export function toXY(loc: BandLocation, field: FootballField): { x: number; y: number } {
   const { xSteps, ySteps, marker, yardline, front, inside, side } = loc;
 
   const yardUnits = side ? (yardline + 10) / 5 : (50 - yardline) / 5;
@@ -111,11 +114,77 @@ export function toXY(loc: BandLocation, field: FieldType): { x: number; y: numbe
 
   let y: number;
   if (field === 'college') {
-    y = marker < 2 ? 64 * marker : marker < 3 ? 107 : 172;
+    y = marker < 2 ? 64 * marker : marker < 3 ? 107 : fieldRows(field) - 1;
   } else {
     y = 56 * marker;
   }
   y += (front ? -1 : 1) * ySteps * 2;
 
   return { x, y };
+}
+
+export type FieldKind = FootballField | 'gym' | 'custom';
+
+/** A playing surface. Everything is measured in half-steps (see FEET_PER_UNIT). */
+export interface FieldSpec {
+  kind: FieldKind;
+  label: string;
+  /** x cells (length of the field) */
+  width: number;
+  /** y cells (depth of the field) */
+  rows: number;
+  /** true for fields where yardline/hash jargon applies */
+  football: boolean;
+}
+
+export const CUSTOM_LIMITS = { min: 20, max: 500 } as const;
+export const GYM_FEET = { length: 94, width: 50 } as const;
+
+const unitsFromFeet = (ft: number) =>
+  Math.round(Math.min(CUSTOM_LIMITS.max, Math.max(CUSTOM_LIMITS.min, ft)) / FEET_PER_UNIT);
+
+export function makeField(kind: FieldKind, custom?: { lengthFt: number; widthFt: number }): FieldSpec {
+  switch (kind) {
+    case 'highschool':
+    case 'college':
+      return {
+        kind,
+        label: kind === 'college' ? 'College football' : 'High school football',
+        width: X_MAX,
+        rows: fieldRows(kind),
+        football: true,
+      };
+    case 'gym':
+      return {
+        kind,
+        label: 'Gym / basketball court',
+        width: unitsFromFeet(GYM_FEET.length),
+        rows: unitsFromFeet(GYM_FEET.width),
+        football: false,
+      };
+    case 'custom':
+      return {
+        kind,
+        label: 'Custom size',
+        width: unitsFromFeet(custom?.lengthFt ?? 200),
+        rows: unitsFromFeet(custom?.widthFt ?? 100),
+        football: false,
+      };
+  }
+}
+
+/** Describes any point on any field in words. */
+export function describePoint(
+  field: FieldSpec,
+  x: number,
+  y: number,
+): { horizontal: string; vertical: string } {
+  if (field.kind === 'highschool' || field.kind === 'college') {
+    return describeLocation(fromXY(x, y, field.kind));
+  }
+  const feet = (u: number) => Math.round(u * FEET_PER_UNIT * 10) / 10;
+  return {
+    horizontal: `${feet(x)} ft from the left end`,
+    vertical: `${feet(y)} ft from the front edge`,
+  };
 }

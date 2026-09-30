@@ -1,14 +1,16 @@
-const js = require('@eslint/js');
-const globals = require('globals');
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import tseslint from 'typescript-eslint';
 
-module.exports = [
-  { ignores: ['public/js/Highmaps/**', 'src/**', 'node_modules/**'] },
+export default tseslint.config(
+  { ignores: ['dist', 'node_modules'] },
   js.configs.recommended,
-  { rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_' }] } },
-  { files: ['**/*.js', 'bin/www'], languageOptions: { sourceType: 'commonjs', globals: globals.node } },
+  ...tseslint.configs.recommended,
   {
-    files: ['public/js/**/*.js'],
-    languageOptions: { sourceType: 'script', globals: { ...globals.browser, angular: 'readonly', app: 'writable', $: 'readonly', Highcharts: 'readonly' } },
-    rules: { 'no-unused-vars': 'off', 'no-redeclare': 'off' }
-  }
-];
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
+    plugins: { 'react-hooks': reactHooks },
+    rules: reactHooks.configs.recommended.rules,
+  },
+);

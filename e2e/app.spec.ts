@@ -201,7 +201,7 @@ for (const scheme of ['light', 'dark'] as const) {
     await open(page);
     // Open every section so all controls are checked.
     await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
-    const results = await new AxeBuilder({ page }).analyze();
+    const results = await new AxeBuilder({ page }).exclude('iframe').analyze(); // third-party embeds (YouTube) are out of our control
     const bad = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     expect(bad.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(' | ')}`)).toEqual([]);
   });

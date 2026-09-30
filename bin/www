@@ -4,22 +4,22 @@
  * Module dependencies.
  */
 
-var app = require('../app');
-var debug = require('debug')('src2:server');
-var http = require('http');
+const app = require('../app');
+const debug = require('debug')('project-metronome:server');
+const http = require('http');
 
 /**
  * Get port from environment and store in Express.
  */
 
-var port = parseInt(process.env.PORT, 10) || 3000;
+const port = parseInt(process.env.PORT, 10) || 3000;
 app.set('port', port);
 
 /**
  * Create HTTP server.
  */
 
-var server = http.createServer(app);
+const server = http.createServer(app);
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -41,11 +41,11 @@ function onError(error) {
   // handle specific listen errors with friendly messages
   switch (error.code) {
     case 'EACCES':
-      console.error('Port ' + port + ' requires elevated privileges');
+      console.error(`Port ${port} requires elevated privileges`);
       process.exit(1);
       break;
     case 'EADDRINUSE':
-      console.error('Port ' + port + ' is already in use');
+      console.error(`Port ${port} is already in use`);
       process.exit(1);
       break;
     default:
@@ -58,5 +58,5 @@ function onError(error) {
  */
 
 function onListening() {
-  debug('Listening on port ' + server.address().port);
+  debug(`Listening on port ${server.address().port}`);
 }

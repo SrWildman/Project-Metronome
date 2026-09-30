@@ -45,7 +45,7 @@ app.factory('Backend', [function() {
     // returns an array of delays for each point
     // if any input value is null - a transparent field is shown
 
-    var x, y, location, marker, name, fDelaysi, c0, c1, dfx, dfy, err, ring, tmp;
+    var x, y, i, location, marker, fDelays, c0, c1, dfx, dfy, err, ring, tmp;
 
     self.xMax = 384;
     self.yMax = 172;
@@ -75,7 +75,7 @@ app.factory('Backend', [function() {
       fDelays[(self.yMax * x) + y] = {
         "x"    : x,
         "y"    : y,
-        "name" : createName(location, marker),
+        "name" : self.createName(location, marker),
         "color" : "transparent"
       };
     

@@ -87,9 +87,14 @@ interface MarkerProps {
   children: ReactNode;
   className: string;
   testId: string;
+  tip: { title: string; body: string };
+  onEnter: () => void;
 }
 
-function Marker({ left, top, label, onKeyDown, onPointerDown, onFocus, selected, children, className, testId }: MarkerProps) {
+function Marker({ left, top, label, onKeyDown, onPointerDown, onFocus, selected, children, className, testId, tip, onEnter }: MarkerProps) {
+  // Keep the tooltip on the map: below markers near the top, and shifted for markers near the sides.
+  const vertical = top < 0.25 ? 'top-full mt-0.5' : 'bottom-full mb-0.5';
+  const horizontal = left < 0.2 ? 'left-0' : left > 0.8 ? 'right-0' : 'left-1/2 -translate-x-1/2';
   return (
     <button
       type="button"
@@ -99,7 +104,9 @@ function Marker({ left, top, label, onKeyDown, onPointerDown, onFocus, selected,
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       onFocus={onFocus}
-      className="absolute z-10 grid size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none place-items-center rounded-full active:cursor-grabbing"
+      onPointerEnter={onEnter}
+      onPointerMove={(e) => e.stopPropagation()}
+      className="group absolute z-10 grid size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none place-items-center rounded-full active:cursor-grabbing"
       style={{ left: `${left * 100}%`, top: `${top * 100}%` }}
     >
       <span
@@ -107,6 +114,14 @@ function Marker({ left, top, label, onKeyDown, onPointerDown, onFocus, selected,
         className={`grid place-items-center text-xs font-bold shadow-md ring-2 ring-black/70 ${className} ${selected ? 'outline-3 outline-offset-2 outline-white' : ''}`}
       >
         {children}
+      </span>
+      <span
+        aria-hidden
+        data-testid={`${testId}-tip`}
+        className={`pointer-events-none absolute z-30 w-max max-w-56 rounded-md bg-black/90 px-2 py-1 text-left text-xs font-normal text-white opacity-0 shadow-lg ring-1 ring-white/30 group-hover:opacity-100 group-focus-visible:opacity-100 ${vertical} ${horizontal}`}
+      >
+        <span className="block font-semibold">{tip.title}</span>
+        {tip.body}
       </span>
     </button>
   );
@@ -255,6 +270,8 @@ export function MapView({ state, field, model, selectedTs, onSelectTs, onMoveTs,
           onPointerDown={(e) => startDrag(e, { kind: 'ts', index: i })}
           onKeyDown={(e) => keyMove(e, ts, (p) => onMoveTs(i, p), state.timeSources.length > 1 ? () => onRemoveTs(i) : undefined)}
           className="size-7 rounded-full bg-yellow-300 text-black"
+          onEnter={() => setHover(null)}
+          tip={{ title: `Time source ${i + 1}`, body: 'The metronome or drumline players listen to. Drag to move it.' }}
         >
           {i + 1}
         </Marker>
@@ -268,6 +285,8 @@ export function MapView({ state, field, model, selectedTs, onSelectTs, onMoveTs,
         onPointerDown={(e) => startDrag(e, { kind: 'fp' })}
         onKeyDown={(e) => keyMove(e, fp, onMoveFocal)}
         className="size-7 rotate-45 rounded-sm bg-white text-black"
+        onEnter={() => setHover(null)}
+        tip={{ title: 'Focal point', body: 'Where the sound needs to line up: the audience, press box or drum major. Drag to move it.' }}
       >
         <span className="-rotate-45">F</span>
       </Marker>
@@ -289,6 +308,8 @@ export function MapView({ state, field, model, selectedTs, onSelectTs, onMoveTs,
         onPointerDown={(e) => startDrag(e, { kind: 'probe' })}
         onKeyDown={(e) => keyMove(e, state.probe, onMoveProbe)}
         className="size-7 rounded-full bg-slate-900 text-white"
+        onEnter={() => setHover(null)}
+        tip={{ title: 'Player marker', body: 'A player position. The numbers below are for this spot. Drag it, or click the map to move it.' }}
       >
         P
       </Marker>

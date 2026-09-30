@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 export const inputClass =
   'w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800';
@@ -121,6 +121,64 @@ export function Slider({
   );
 }
 
+const clampTo = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+const tidy = (v: number) => (Number.isFinite(v) ? String(Math.round(v * 100) / 100) : '');
+
+/**
+ * A number input you can clear and retype freely. While you're typing it keeps your text and only
+ * reports values that are in range; when you leave the field it settles on a valid number.
+ */
+export function DraftNumber({
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  className = inputClass,
+  id,
+  ariaLabel,
+  testId,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  className?: string;
+  id?: string;
+  ariaLabel?: string;
+  testId?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      id={id}
+      aria-label={ariaLabel}
+      data-testid={testId}
+      type="number"
+      inputMode="decimal"
+      min={min}
+      max={max}
+      step={step}
+      value={draft ?? tidy(value)}
+      onChange={(e) => {
+        const text = e.target.value;
+        setDraft(text);
+        const v = Number.parseFloat(text);
+        if (Number.isFinite(v) && v >= min && v <= max) onChange(v);
+      }}
+      onBlur={() => {
+        if (draft !== null) {
+          const v = Number.parseFloat(draft);
+          if (Number.isFinite(v)) onChange(clampTo(v, min, max));
+        }
+        setDraft(null);
+      }}
+      className={className}
+    />
+  );
+}
+
 export function NumberField({
   label,
   value,
@@ -145,20 +203,7 @@ export function NumberField({
         {label}
       </label>
       <div className="flex items-center gap-2">
-        <input
-          id={id}
-          type="number"
-          inputMode="decimal"
-          min={min}
-          max={max}
-          step={step}
-          value={Number.isFinite(value) ? value : ''}
-          onChange={(e) => {
-            const v = e.target.valueAsNumber;
-            if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
-          }}
-          className={inputClass}
-        />
+        <DraftNumber id={id} value={value} min={min} max={max} step={step} onChange={onChange} />
         {suffix && <span className="text-sm text-slate-600 dark:text-slate-400">{suffix}</span>}
       </div>
     </div>

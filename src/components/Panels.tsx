@@ -23,7 +23,7 @@ import {
   type AppState,
 } from '../core/state';
 import type { AppActions } from '../hooks/useAppState';
-import { buttonClass, Hint, inputClass, NumberField, RadioGroup, SelectField, Section, Slider } from './ui';
+import { buttonClass, DraftNumber, Hint, inputClass, NumberField, RadioGroup, SelectField, Section, Slider } from './ui';
 
 interface PanelProps {
   state: AppState;
@@ -253,51 +253,55 @@ export function TimingPanel({
       />
       <fieldset>
         <legend className="mb-1 text-sm font-medium">Tempo sections</legend>
-        <Hint>Add a section for each tempo in the show, then pick which one the map shows.</Hint>
-        <ul className="mt-2 space-y-2">
+        <Hint>Add a section for each tempo in the show, and choose which one the map shows with the round button in the first column.</Hint>
+        <div className="mt-2 space-y-2">
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_2.5rem] items-center gap-2">
+          <span className="text-center text-xs font-medium text-slate-600 dark:text-slate-400">On map</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Section name</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Tempo (bpm)</span>
+          <span aria-hidden />
+          </div>
           {state.tempos.map((t, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="active-tempo"
-                aria-label={`Show ${t.label} on the map`}
-                checked={i === state.activeTempo}
-                onChange={() => actions.patch({ activeTempo: i })}
-                className="size-4 shrink-0 accent-accent"
-              />
+            <div key={i} className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_2.5rem] items-center gap-2">
+              <label className="grid min-h-10 cursor-pointer place-items-center">
+                <input
+                  type="radio"
+                  name="active-tempo"
+                  aria-label={`Show ${t.label || `section ${i + 1}`} on the map`}
+                  checked={i === state.activeTempo}
+                  onChange={() => actions.patch({ activeTempo: i })}
+                  className="size-4 accent-accent"
+                />
+              </label>
               <input
                 aria-label={`Section ${i + 1} name`}
+                placeholder="Section name"
                 value={t.label}
                 maxLength={40}
                 onChange={(e) => actions.updateTempo(i, { label: e.target.value })}
-                className={`${inputClass} min-w-0 flex-1`}
+                onBlur={() => t.label.trim() === '' && actions.updateTempo(i, { label: `Section ${i + 1}` })}
+                className={`${inputClass} min-w-0`}
               />
-              <input
-                aria-label={`${t.label} tempo in beats per minute`}
-                type="number"
-                inputMode="numeric"
+              <DraftNumber
+                ariaLabel={`${t.label || `Section ${i + 1}`} tempo in beats per minute`}
+                testId={`bpm-${i}`}
                 min={TEMPO_LIMITS.min}
                 max={TEMPO_LIMITS.max}
                 value={t.bpm}
-                onChange={(e) => {
-                  const v = e.target.valueAsNumber;
-                  if (Number.isFinite(v)) actions.updateTempo(i, { bpm: v });
-                }}
-                className={`${inputClass} w-20`}
-                data-testid={`bpm-${i}`}
+                onChange={(bpm) => actions.updateTempo(i, { bpm })}
               />
               <button
                 type="button"
-                className={buttonClass}
-                aria-label={`Remove ${t.label}`}
+                className={`${buttonClass} px-0`}
+                aria-label={`Remove ${t.label || `section ${i + 1}`}`}
                 disabled={state.tempos.length <= 1}
                 onClick={() => actions.removeTempo(i)}
               >
                 ✕
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
         <button
           type="button"
           className={`${buttonClass} mt-2`}
@@ -322,7 +326,7 @@ export function TimingPanel({
               const err = errorSeconds(t.bpm, state.noteDivisor);
               return (
                 <tr key={i} className="border-t border-slate-200 dark:border-slate-800">
-                  <td className="py-1">{t.label} <span className="text-slate-500">({t.bpm})</span></td>
+                  <td className="py-1">{t.label || `Section ${i + 1}`} <span className="text-slate-500">({t.bpm})</span></td>
                   <td className="py-1 text-right tabular-nums">{Math.round(err * 1000)} ms</td>
                   <td className="py-1 text-right tabular-nums">{Math.round(stats.greenFraction(err) * 100)}%</td>
                 </tr>

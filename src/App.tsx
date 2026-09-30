@@ -9,8 +9,6 @@ import { ZONE_HEX } from './core/render';
 import { toScenario } from './core/state';
 import { useAppState } from './hooks/useAppState';
 
-const baseUrl = import.meta.env.BASE_URL;
-
 function Swatch({ color, pattern }: { color: string; pattern?: string }) {
   return (
     <span
@@ -63,14 +61,14 @@ export function App() {
   };
 
   return (
-    <>
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
       <a
         href="#map"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 focus:rounded focus:bg-white focus:p-2 focus:text-black"
       >
         Skip to the map
       </a>
-      <header className="border-b border-slate-200 bg-slate-900 text-white dark:border-slate-800">
+      <header className="shrink-0 border-b border-slate-200 bg-slate-900 text-white dark:border-slate-800">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div>
             <h1 className="text-lg font-bold tracking-widest uppercase">Project Metronome</h1>
@@ -95,10 +93,10 @@ export function App() {
         </p>
       )}
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4 lg:grid lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-4 lg:grid lg:min-h-0 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:overflow-hidden">
         {/* Right column on desktop. On phones the wrappers disappear so the map can stay pinned to the top. */}
-        <div className="contents lg:col-start-2 lg:row-start-1 lg:block lg:space-y-4">
-          <div className="contents lg:sticky lg:top-4 lg:block lg:max-h-[calc(100vh-2rem)] lg:space-y-4 lg:self-start lg:overflow-y-auto">
+        <div data-testid="main-column" className="contents lg:col-start-2 lg:row-start-1 lg:block lg:min-h-0 lg:space-y-4 lg:overflow-y-auto lg:pr-1">
+          <div className="contents lg:block lg:space-y-4">
             <div className="sticky top-0 z-20 order-1 -mx-4 bg-slate-50/95 px-4 pt-2 pb-2 backdrop-blur lg:static lg:mx-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none dark:bg-slate-950/95">
               <MapView
                 state={state}
@@ -166,7 +164,7 @@ export function App() {
           </div>
         </div>
 
-        <div className="order-3 space-y-4 lg:col-start-1 lg:row-start-1">
+        <div data-testid="sidebar" className="order-3 space-y-4 lg:col-start-1 lg:row-start-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           <FieldPanel state={state} field={field} actions={actions} />
           <TimeSourcePanel state={state} field={field} actions={actions} selected={selectedTs} onSelect={setSelectedTs} />
           <FocalPanel state={state} field={field} actions={actions} />
@@ -175,12 +173,6 @@ export function App() {
           <DisplayPanel state={state} actions={actions} />
         </div>
       </main>
-
-      <footer className="px-4 py-8 text-center text-sm text-slate-600 dark:text-slate-400">
-        Created by Brian Boudreaux, Zack Shackleton, Chris Sipes, and Sam Wildman · contact@projectmetronome.com
-        <br />
-        Works offline once loaded. <a className="underline" href={`${baseUrl}`}>Start fresh</a>
-      </footer>
-    </>
+    </div>
   );
 }

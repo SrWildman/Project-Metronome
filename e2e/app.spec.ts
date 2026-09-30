@@ -100,6 +100,61 @@ test('temperature and tempo change the numbers', async ({ page }) => {
   await expect(page.getByTestId('tempo-table')).toContainText('90');
 });
 
+test('tempo and section name fields can be cleared and retyped', async ({ page }) => {
+  await open(page);
+  const bpm = page.getByTestId('bpm-0');
+  await bpm.fill('');
+  await expect(bpm).toHaveValue('');
+  await bpm.pressSequentially('90');
+  await expect(bpm).toHaveValue('90');
+  await bpm.blur();
+  await expect(page.getByText(/^\d+\.\d\d at 90 bpm$/)).toBeVisible();
+
+  const name = page.getByLabel('Section 1 name');
+  await name.fill('');
+  await expect(name).toHaveValue('');
+  await name.pressSequentially('Opener');
+  await expect(name).toHaveValue('Opener');
+
+  // Leaving a name or tempo blank puts something sensible back.
+  await name.fill('');
+  await bpm.fill('');
+  await bpm.blur();
+  await expect(name).toHaveValue('Section 1');
+  await expect(bpm).toHaveValue('90');
+});
+
+test('markers explain themselves on hover', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'hover is a mouse feature');
+  await open(page);
+  for (const [id, text] of [['ts-0', 'Time source 1'], ['fp', 'Focal point'], ['probe', 'Player marker']] as const) {
+    await page.getByTestId(id).hover();
+    await expect(page.getByTestId(`${id}-tip`)).toContainText(text);
+    await expect(page.getByTestId(`${id}-tip`)).toHaveCSS('opacity', '1');
+  }
+});
+
+test('the sidebar and main column scroll independently on desktop', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'two-column layout is for wide screens');
+  await open(page);
+  const mapBefore = (await page.getByTestId('map').boundingBox())!;
+  const sidebar = page.getByTestId('sidebar');
+  const box = (await sidebar.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 700);
+  await expect.poll(() => sidebar.evaluate((el) => el.scrollTop)).toBeGreaterThan(300);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const mapAfter = (await page.getByTestId('map').boundingBox())!;
+  expect(Math.round(mapAfter.y)).toBe(Math.round(mapBefore.y));
+
+  const main = page.getByTestId('main-column');
+  const mbox = (await main.boundingBox())!;
+  await page.mouse.move(mbox.x + mbox.width / 2, mbox.y + mbox.height / 2);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => main.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+  expect(await sidebar.evaluate((el) => el.scrollTop)).toBeGreaterThan(300);
+});
+
 test('the delay demo can be started and stopped', async ({ page }) => {
   await open(page);
   const play = page.getByTestId('play');
